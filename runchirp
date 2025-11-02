@@ -1,0 +1,44 @@
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+import numpy as np
+import librosa
+import soundfile as sf
+import matplotlib.pyplot as plt
+import IPython.display as ipd
+import os
+import shutil
+
+def invert_spectrogram(spec, sample_rate=16384, n_fft=1024, hop_length=256, n_iter=60):
+    # Un-normalize if needed
+    spec = np.squeeze(spec)
+    spec = spec * 80 - 80  # From [0,1] back to [-80, 0] dB (approx)
+
+    # Convert back to linear power
+    power_spec = librosa.db_to_power(spec)
+
+    # Reconstruct waveform with Griffin-Lim
+    waveform = librosa.feature.inverse.mel_to_audio(
+        power_spec,
+        sr=sample_rate,
+        n_fft=n_fft,
+        hop_length=hop_length,
+        n_iter=n_iter
+    )
+    return waveform
+
+#generates a user defined number of chirps from epoch 245 generator
+def generate(generator, numchirps=1):
+    chirplist = []
+    for i in range(numchirps):
+        noise = tf.random.normal([1, 100])
+        generated_spec = generator(noise, training=False).numpy()
+        waveform = invert_spectrogram(generated_spec)
+        chirplist.append(waveform)
+    return chirplist
+
+generator = load_model('/kaggle/input/gen275/keras/default/1/generator_epoch_275.keras')
+numtimes = int(input("how many chirps do you want? >>"))
+audiolist = generate(generator, numtimes)
+for i in range(numtimes):
+    e = ipd.Audio(audiolist[i], rate=16384)
+    display(e)
